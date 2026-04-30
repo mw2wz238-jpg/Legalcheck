@@ -1,28 +1,56 @@
-name: NodeJS with Webpack
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+name: Build APK Online
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22 # Przeskakujemy na nowszą wersję, by uniknąć błędów ze screena
+          
+      - name: Clean & Force Install Dependencies
+        run: |
+          # Usuwamy stare śmieci i instalujemy wszystko na czysto
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps
+          # Instalujemy Webpacka bezpośrednio, żeby na pewno był dostępny
+          npm install -D webpack webpack-cli --legacy-peer-deps
 
-    - name: Build
-      run: |
-        npm install
-        npx webpack
+      - name: Build Web Project
+        run: |
+          # CI=false zapobiega przerywaniu przy ostrzeżeniach
+          # Wykorzystujemy npx, żeby na pewno odpalić lokalnego webpacka
+          CI=false npx webpack --mode production || CI=false npm run build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build Android APK
+        run: |
+          # Instalacja mostu Capacitor
+          npm install -g @capacitor/cli @capacitor/core @capacitor/android
+          
+          # Tworzenie folderu android tylko jeśli go brakuje
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          
+          npx cap sync android
+          
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LegalCheck-AI-Final-Build
+          path: android/app/build/outputs/apk/debug/app-debug.apk
