@@ -11,24 +11,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Force Install Webpack & Dependencies
+          node-version: 22 # Przeskakujemy na nowszą wersję, by uniknąć błędów ze screena
+          
+      - name: Clean & Force Install Dependencies
         run: |
-          # Czyścimy pamięć podręczną i instalujemy wszystko z wymuszeniem 'yes'
-          npm cache clean --force
-          npm install -g webpack-cli webpack --yes
+          # Usuwamy stare śmieci i instalujemy wszystko na czysto
+          rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
-          # Instalujemy webpack-cli lokalnie jako devDependency, żeby npm run build go widział
-          npm install --save-dev webpack-cli --legacy-peer-deps
+          # Instalujemy Webpacka bezpośrednio, żeby na pewno był dostępny
+          npm install -D webpack webpack-cli --legacy-peer-deps
 
-      - name: Build Web Project (No Interactive)
+      - name: Build Web Project
         run: |
-          # Ustawiamy zmienną CI na false i dodajemy flagę --yes do skryptu
-          export NODE_OPTIONS="--max-old-space-size=4096"
-          CI=false npm run build -- --yes
+          # CI=false zapobiega przerywaniu przy ostrzeżeniach
+          # Wykorzystujemy npx, żeby na pewno odpalić lokalnego webpacka
+          CI=false npx webpack --mode production || CI=false npm run build
 
-      - name: Setup Java & Android SDK
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -36,10 +35,10 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # Instalacja narzędzi Capacitora
+          # Instalacja mostu Capacitor
           npm install -g @capacitor/cli @capacitor/core @capacitor/android
           
-          # Tworzenie folderu android jeśli go nie ma
+          # Tworzenie folderu android tylko jeśli go brakuje
           if [ ! -d "android" ]; then
             npx cap add android
           fi
@@ -53,5 +52,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LegalCheck-AI-Success-APK
+          name: LegalCheck-AI-Final-Build
           path: android/app/build/outputs/apk/debug/app-debug.apk
