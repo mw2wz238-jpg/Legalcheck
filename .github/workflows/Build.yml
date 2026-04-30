@@ -12,28 +12,49 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Critical Build Tools
         run: |
-          npm install --legacy-peer-deps
+          # Instalujemy webpacka globalnie i lokalnie, aby system go widział wszędzie
+          npm install -g webpack-cli webpack
           npm install -D webpack-cli webpack --legacy-peer-deps
 
-      - name: Build Project
+      - name: Install App Dependencies
         run: |
-          # Budujemy projekt, wymuszając brak interakcji
-          CI=false npm run build
+          npm install --legacy-peer-deps
 
-      - name: Setup Java
+      - name: Build Web Project
+        run: |
+          # Wymuszamy brak pytań i ignorujemy błędy wersji
+          CI=false npm run build -- --yes
+
+      - name: Setup Java & Android
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Initialize Android & Build APK
+        run: |
+          # Instalacja Capacitora, jeśli go nie ma
+          npm install -g @capacitor/cli @capacitor/core @capacitor/android
+          
+          # Sprawdzenie czy folder android istnieje, jeśli nie - tworzenie
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          
+          npx cap sync android
+          
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-      - name: Initialize Capacitor & Build APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LegalCheck-AI-Final-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
         run: |
           # Jeśli folder 'android' nie istnieje, dodajemy go
           if [ ! -d "android" ]; then
