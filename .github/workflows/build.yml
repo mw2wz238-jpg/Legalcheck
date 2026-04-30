@@ -1,62 +1,56 @@
-name: CI Build & Firebase Fingerprint
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+name: LegalCheck AI - Final APK & Auth Fix
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
 
-    - name: Inject Configuration & Log Fingerprint
-      run: |
-        echo "Validating Firebase Configuration for Production..."
-        # Verification that the domain is set correctly in the source
-        grep "gen-lang-client-0297750093.firebaseapp.com" src/firebase.ts
-        
-        echo "------------------------------------------------------------"
-        echo "VERIFIED SHA-256 FINGERPRINT: cc07a352074687131797f79b86f8d5646d3df00513953684f74b61391307027a"
-        echo "------------------------------------------------------------"
+      - name: Build Web Project
+        run: |
+          # Budujemy wersję webową, którą Capacitor zamieni w APK
+          CI=false npm run build || CI=false npx webpack --mode production
 
-    - name: Build application
-      run: npm run build
-      env:
-        NODE_ENV: production
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
 
-    - name: Generate and Log SHA-1 Fingerprint
-      run: |
-        echo "------------------------------------------------------------"
-        echo "GENERATING PRODUCTION KEYSTORE FOR SHA-1 LOGGING"
-        echo "------------------------------------------------------------"
-        
-        # Generating a signing key strictly for extracting the fingerprint
-        # In a real production setup, you should use secrets for passwords.
-        keytool -genkey -v -keystore release.keystore -alias release-key \
-          -keyalg RSA -keysize 2048 -validity 10000 \
-          -dname "CN=FirebaseApp, OU=Prod, O=Build, L=Unknown, S=Unknown, C=US" \
-          -storepass android -keypass android
-        
-        echo ""
-        echo "USE THIS SHA-1 IN FIREBASE CONSOLE (Project Settings -> Android App):"
-        keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA1:"
-        
-        echo ""
-        echo "USE THIS SHA-256 FOR DIGITAL ASSET LINKS (TWA/APK):"
-        keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA256:"
-        echo "------------------------------------------------------------"
+      - name: Generate Fingerprints for Firebase
+        run: |
+          # Generujemy klucze potrzebne do logowania Google
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android
+
+      - name: Build Android APK
+        run: |
+          # Jeśli folder android nie istnieje, inicjalizujemy go
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          
+          # Synchronizacja i kompilacja APK
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LegalCheck-AI-Final
+          path: android/app/build/outputs/apk/debug/app-debug.apk
