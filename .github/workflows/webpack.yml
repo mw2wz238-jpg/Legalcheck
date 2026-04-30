@@ -11,21 +11,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # Przeskakujemy na nowszą wersję, by uniknąć błędów ze screena
-          
-      - name: Clean & Force Install Dependencies
+          node-version: 22
+
+      - name: Install Dependencies
         run: |
-          # Usuwamy stare śmieci i instalujemy wszystko na czysto
-          rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
-          # Instalujemy Webpacka bezpośrednio, żeby na pewno był dostępny
-          npm install -D webpack webpack-cli --legacy-peer-deps
+          npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
 
       - name: Build Web Project
         run: |
-          # CI=false zapobiega przerywaniu przy ostrzeżeniach
-          # Wykorzystujemy npx, żeby na pewno odpalić lokalnego webpacka
-          CI=false npx webpack --mode production || CI=false npm run build
+          CI=false npm run build || CI=false npx webpack --mode production
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -33,16 +28,17 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Android APK
+      - name: Initialize and Build Android
         run: |
-          # Instalacja mostu Capacitor
-          npm install -g @capacitor/cli @capacitor/core @capacitor/android
-          
-          # Tworzenie folderu android tylko jeśli go brakuje
+          # Jeśli folder android nie istnieje, tworzymy go na nowo z Twoim appId
           if [ ! -d "android" ]; then
             npx cap add android
           fi
           
+          # Kluczowy moment: wymuszamy instalację platformy wewnątrz projektu
+          npm install @capacitor/android --legacy-peer-deps
+          
+          # Synchronizacja i budowa
           npx cap sync android
           
           cd android
@@ -52,5 +48,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LegalCheck-AI-Final-Build
+          name: LegalCheck-AI-Final-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
