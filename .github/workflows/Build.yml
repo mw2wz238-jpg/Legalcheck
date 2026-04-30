@@ -5,27 +5,52 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+
       - name: Install Dependencies
-        run: npm install
+        run: |
+          npm install --legacy-peer-deps
+          npm install -D webpack-cli webpack --legacy-peer-deps
+
       - name: Build Project
-        run: npm run build
+        run: |
+          # Budujemy projekt, wymuszając brak interakcji
+          CI=false npm run build
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Build Android APK
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Initialize Capacitor & Build APK
         run: |
-          npx cap add android
-          npx cap copy android
-          cd android && ./gradlew assembleDebug
-      - name: Upload APK
+          # Jeśli folder 'android' nie istnieje, dodajemy go
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          
+          # Synchronizacja kodu webowego z projektem Androida
+          npx cap sync android
+          
+          # Budowanie finalnego pliku APK za pomocą Gradle
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LegalCheck-AI-Debug
+          name: LegalCheck-AI-Debug-Build
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 5
