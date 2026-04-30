@@ -1,6 +1,0 @@
-{
-  "appId": "com.legalcheck.ai",
-  "appName": "LegalCheck AI",
-  "webDir": "dist",
-  "bundledWebRuntime": false
-}

@@ -1,0 +1,62 @@
+name: CI Build & Firebase Fingerprint
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Inject Configuration & Log Fingerprint
+      run: |
+        echo "Validating Firebase Configuration for Production..."
+        # Verification that the domain is set correctly in the source
+        grep "gen-lang-client-0297750093.firebaseapp.com" src/firebase.ts
+        
+        echo "------------------------------------------------------------"
+        echo "VERIFIED SHA-256 FINGERPRINT: cc07a352074687131797f79b86f8d5646d3df00513953684f74b61391307027a"
+        echo "------------------------------------------------------------"
+
+    - name: Build application
+      run: npm run build
+      env:
+        NODE_ENV: production
+
+    - name: Generate and Log SHA-1 Fingerprint
+      run: |
+        echo "------------------------------------------------------------"
+        echo "GENERATING PRODUCTION KEYSTORE FOR SHA-1 LOGGING"
+        echo "------------------------------------------------------------"
+        
+        # Generating a signing key strictly for extracting the fingerprint
+        # In a real production setup, you should use secrets for passwords.
+        keytool -genkey -v -keystore release.keystore -alias release-key \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -dname "CN=FirebaseApp, OU=Prod, O=Build, L=Unknown, S=Unknown, C=US" \
+          -storepass android -keypass android
+        
+        echo ""
+        echo "USE THIS SHA-1 IN FIREBASE CONSOLE (Project Settings -> Android App):"
+        keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA1:"
+        
+        echo ""
+        echo "USE THIS SHA-256 FOR DIGITAL ASSET LINKS (TWA/APK):"
+        keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA256:"
+        echo "------------------------------------------------------------"

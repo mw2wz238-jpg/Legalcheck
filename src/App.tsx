@@ -18,7 +18,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { analyzeLegalDocument, chatWithDocument } from "./geminiService";
 import { 
-  signInWithPopup, 
+  signInWithRedirect, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signOut,
@@ -497,7 +497,7 @@ export default function App() {
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (err) {
       console.error(err);
       setToast({ message: "Logowanie nieudane. Spróbuj ponownie.", type: "error" });
