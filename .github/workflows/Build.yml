@@ -1,56 +1,15 @@
-name: Build APK Online
-on: [push, workflow_dispatch]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22 # Przeskakujemy na nowszą wersję, by uniknąć błędów ze screena
-          
-      - name: Clean & Force Install Dependencies
-        run: |
-          # Usuwamy stare śmieci i instalujemy wszystko na czysto
-          rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps
-          # Instalujemy Webpacka bezpośrednio, żeby na pewno był dostępny
-          npm install -D webpack webpack-cli --legacy-peer-deps
-
-      - name: Build Web Project
-        run: |
-          # CI=false zapobiega przerywaniu przy ostrzeżeniach
-          # Wykorzystujemy npx, żeby na pewno odpalić lokalnego webpacka
-          CI=false npx webpack --mode production || CI=false npm run build
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Build Android APK
         run: |
-          # Instalacja mostu Capacitor
-          npm install -g @capacitor/cli @capacitor/core @capacitor/android
+          # Instalacja niezbędnych dodatków
+          npm install @capacitor/android --legacy-peer-deps
           
-          # Tworzenie folderu android tylko jeśli go brakuje
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
+          # Inicjalizacja Capacitora, jeśli nie było pliku (na wszelki wypadek)
+          npx cap init "LegalCheck AI" "com.legalcheck.ai" --web-dir dist
           
+          # Dodanie platformy i budowa
+          npx cap add android || true
           npx cap sync android
           
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: LegalCheck-AI-Final-Build
-          path: android/app/build/outputs/apk/debug/app-debug.apk
