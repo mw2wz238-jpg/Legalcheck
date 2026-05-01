@@ -63,4 +63,8 @@ export const signInWithGoogle = async () => {
   }
 };
 
-export { onAuthStateChanged };
+export { 
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+};

@@ -13,7 +13,7 @@ import {
   Camera, Plus, X, FileText, LogOut, LogIn, ChevronRight,
   Wallet, Calendar, Lightbulb, History, Trash2, Edit3, 
   Columns, CheckCircle2, ChevronLeft, Save, Zap, MessageSquare, Send, User, Bot, Share, HelpCircle,
-  Lock, ShieldCheck, CreditCard
+  Lock, ShieldCheck, CreditCard, Mail
 } from "lucide-react";
 import { analyzeLegalDocument, chatWithDocument } from "./geminiService";
 import { 
@@ -36,7 +36,13 @@ import {
   getDocFromServer,
   Timestamp
 } from 'firebase/firestore';
-import { auth, db, signInWithGoogle } from './firebase';
+import { 
+  auth, 
+  db, 
+  signInWithGoogle, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword 
+} from './firebase';
 
 /**
  * CONFIGURATION NOTES:
@@ -525,9 +531,17 @@ export default function App() {
     } catch (err: any) {
       console.error("Email auth error:", err);
       let msg = "Błąd autoryzacji.";
-      if (err.code === "auth/email-already-in-use") msg = "Ten e-mail jest już zajęty.";
-      if (err.code === "auth/weak-password") msg = "Hasło jest za słabe.";
-      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") msg = "Błędny e-mail lub hasło.";
+      if (err.code === "auth/operation-not-allowed") {
+        msg = "Logowanie e-mailem jest wyłączone. Włącz 'Email/Password' w konsoli Firebase (Authentication > Sign-in method).";
+      } else if (err.code === "auth/email-already-in-use") {
+        msg = "Ten e-mail jest już przypisany do innego konta.";
+      } else if (err.code === "auth/weak-password") {
+        msg = "Hasło jest za słabe (wymagane min. 6 znaków).";
+      } else if (err.code === "auth/invalid-email") {
+        msg = "Niepoprawny format adresu e-mail.";
+      } else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        msg = "Błędny e-mail lub hasło. Sprawdź dane i spróbuj ponownie.";
+      }
       setToast({ message: msg, type: "error" });
     }
   };
