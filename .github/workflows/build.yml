@@ -37,12 +37,24 @@ jobs:
         run: |
           npx cap add android || true
           npx cap sync android
+          
+          # KLUCZOWE POPRAWKI KONFIGURACJI GRADLE:
+          # 1. Wymuszenie wersji Kotlina w głównym pliku projektu
+          sed -i 's/kotlin_version = .*/kotlin_version = "1.8.20"/' android/build.gradle
+          
+          # 2. Dodanie strategii rozwiązywania konfliktów bezpośrednio do app/build.gradle
+          echo "android {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.20'
+                      force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20'
+                      force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20'
+                  }
+              }
+          }" >> android/app/build.gradle
+          
           chmod +x android/gradlew
-          
-          # FIX DLA DUPLICATE CLASS KOTLIN:
-          echo "configurations.all { resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22' }" >> android/build.gradle
-          
-          cd android && ./gradlew assembleDebug
+          cd android && ./gradlew clean assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -53,5 +65,4 @@ jobs:
       - name: Generate and Log SHA-1 Fingerprint
         run: |
           echo "--- TWOJE SHA-1 DLA FIREBASE ---"
-          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep SHA1 || echo "Klucz zostanie wyświetlony po pomyślnym buildzie"
-          
+          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep SHA1 || echo "Klucz dostępny po pomyślnym buildzie"
