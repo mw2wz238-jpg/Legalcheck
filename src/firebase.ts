@@ -21,6 +21,12 @@ const config = {
   authDomain: `${firebaseConfig.projectId}.firebaseapp.com`
 };
 
+console.log("Firebase Env Init:", {
+  domain: window.location.hostname,
+  protocol: window.location.protocol,
+  authDomain: config.authDomain
+});
+
 const app = !getApps().length ? initializeApp(config) : getApp();
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);

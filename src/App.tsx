@@ -547,7 +547,10 @@ export default function App() {
     setToast({ message: "Uruchomiono tryb testowy. Pamiętaj, że synchronizacja z bazą danych może być ograniczona.", type: "info" });
   };
 
+  const [loginErrorDetail, setLoginErrorDetail] = useState<string | null>(null);
+
   const handleLogin = async () => {
+    setLoginErrorDetail(null);
     try {
       const result = await signInWithGoogle();
       if (result?.user) {
@@ -555,9 +558,10 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Login error:", err);
+      setLoginErrorDetail(`${err.code}: ${err.message}`);
       // Fallback for environment issues
       setShowEmailLogin(true);
-      setToast({ message: "Problem z logowaniem Google. Spróbuj zalogować się e-mailem lub użyj trybu testowego.", type: "error" });
+      setToast({ message: "Problem z logowaniem Google. Spróbuj e-maila lub trybu testowego.", type: "error" });
     }
   };
 
@@ -954,6 +958,9 @@ export default function App() {
                   <p className="text-[9px] text-indigo-300 font-bold uppercase tracking-wider mb-2">Diagnostyka Logowania:</p>
                   <div className="space-y-1 text-[8px] text-zinc-400 font-mono break-all">
                     <p>Domena: <span className="text-white">{window.location.hostname}</span></p>
+                    {loginErrorDetail && (
+                      <p className="mt-2 text-red-400 font-bold">Ostatni błąd: {loginErrorDetail}</p>
+                    )}
                     <p className="mt-2 leading-relaxed">
                       💡 Jeśli logowanie Google nie działa: Dodaj powyższą domenę do <span className="text-indigo-400">Firebase Console &gt; Auth &gt; Settings &gt; Authorized Domains</span>.
                     </p>
