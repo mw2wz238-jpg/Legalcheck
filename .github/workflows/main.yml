@@ -35,17 +35,19 @@ jobs:
 
     - name: Build Android APK
       run: |
-        echo "CLEANING AND BUILDING DEBUG APK"
+        echo "INITIALIZING AND BUILDING ANDROID APK"
         
-        if [ -d "android" ]; then
-          npx cap sync android
-          cd android
-          # Clean first as requested, then build debug
-          ./gradlew clean assembleDebug -Pkotlin.version=1.8.20
-        else
-          echo "Error: 'android' directory not found. Please ensure Capacitor is initialized."
-          exit 1
+        # Add android platform if missing
+        if [ ! -d "android" ]; then
+          npx cap add android
         fi
+        
+        # Copy web assets to android
+        npx cap copy
+        
+        cd android
+        # Clean as requested and assemble debug with Kotlin enforcement
+        ./gradlew clean assembleDebug -Pkotlin.version=1.8.20
 
     - name: Generate and Log SHA-1 Fingerprint
       run: |
@@ -53,10 +55,17 @@ jobs:
         echo "EXTRACTING DEBUG FINGERPRINT FOR FIREBASE"
         echo "------------------------------------------------------------"
         
-        if [ -f "android/app/debug.keystore" ]; then
-           keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep "SHA1:"
+        # Checking possible locations for debug.keystore
+        KEYSTORE_PATH="android/app/debug.keystore"
+        if [ ! -f "$KEYSTORE_PATH" ]; then
+           # Search for it in the android directory if not in standard path
+           KEYSTORE_PATH=$(find android -name "debug.keystore" | head -n 1)
+        fi
+
+        if [ -n "$KEYSTORE_PATH" ] && [ -f "$KEYSTORE_PATH" ]; then
+           keytool -list -v -keystore "$KEYSTORE_PATH" -alias androiddebugkey -storepass android | grep "SHA1:"
         else
-           echo "Debug keystore not found in default android location."
+           echo "Debug keystore not found. It might be generated during the first run if missing."
         fi
         echo "------------------------------------------------------------"
 
