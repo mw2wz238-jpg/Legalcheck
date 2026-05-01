@@ -478,15 +478,27 @@ export default function App() {
   useEffect(() => {
     const checkRedirect = async () => {
       try {
+        console.log("App mounted: checking redirect result...");
         const result = await handleRedirectResult();
         if (result?.user) {
+          console.log("Logged in via redirect:", result.user.email);
+          setUser(result.user as FirebaseUser);
           setToast({ message: "Zalogowano pomyślnie!", type: "success" });
         }
-      } catch (error) {
-        console.error("Auth redirect error:", error);
+      } catch (error: any) {
+        console.error("Auth redirect error handler:", error);
+        if (error.code === 'auth/unauthorized-domain') {
+          setToast({ message: "Błąd: domena nie jest uprawniona w konsoli Firebase.", type: "error" });
+        }
       }
     };
-    checkRedirect();
+    
+    // Give Auth a moment to initialize
+    const timer = setTimeout(() => {
+      checkRedirect();
+    }, 800);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // Load history from localStorage on mount

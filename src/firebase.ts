@@ -1,71 +1,65 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { 
-  initializeAuth, 
-  indexedDBLocalPersistence, 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence, 
   browserPopupRedirectResolver, 
-  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
   GoogleAuthProvider,
-  getAuth,
-  getRedirectResult
+  onAuthStateChanged
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Use config directly to avoid any projection errors
+// Inicjalizacja Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-/**
- * Initialize Auth with explicit persistence and resolver for cross-platform stability.
- * Capacitor/WebView environments benefit significantly from indexedDB and explicit resolvers.
- */
-export const auth = (() => {
-  const existingApps = getApps();
-  if (existingApps.length > 0) {
-    try {
-      // Attempt to get existing auth instance to avoid re-init errors
-      return getAuth(app);
-    } catch (e) {
-      // If not initialized yet, proceed to initializeAuth
-    }
-  }
-  return initializeAuth(app, {
-    persistence: [indexedDBLocalPersistence],
-    popupRedirectResolver: browserPopupRedirectResolver,
-  });
-})();
-
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 /**
- * Single entry point for Google Authentication.
- * Uses popup flow with an explicit resolver, which is generally more reliable 
- * in Capacitor when configured with standard browser support.
+ * Inicjalizacja Auth z obsługą trwałości sesji dla środowisk mobilnych.
+ * browserLocalPersistence jest często bardziej niezawodny w WebView niż indexedDB.
+ */
+export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(err => {
+  console.error("Auth persistence error:", err);
+});
+
+/**
+ * Główna funkcja logowania przez Google (Redirect Flow).
+ * W środowiskach mobilnych (APK/WebView) przekierowanie jest zazwyczaj
+ * bardziej stabilne niż okna popup.
  */
 export const signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
-  // Ensure we always prompt for account to avoid auto-login issues in some APK environments
   provider.setCustomParameters({ prompt: 'select_account' });
   
+  console.log("Starting Google Sign-In Redirect...");
   try {
-    // Try Popup first - it's often more reliable in modern webviews if allowed
-    const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
-    return result;
+    return await signInWithRedirect(auth, provider);
   } catch (error) {
-    console.error("SignInWithPopup Error:", error);
-    // If it's a conflict or environment issue, we can try to fall back or just throw for debugging
+    console.error("SignInWithRedirect Error:", error);
     throw error;
   }
 };
 
 /**
- * Fallback for handling redirect result if needed (e.g. if we switched to redirect flow)
+ * Przechwytywanie wyniku logowania po powrocie z przekierowania.
  */
 export const handleRedirectResult = async () => {
   try {
-    const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+    console.log("Checking for redirect result...");
+    const result = await getRedirectResult(auth);
+    if (result) {
+      console.log("Auth result found:", result.user.email);
+    } else {
+      console.log("No redirect result found.");
+    }
     return result;
   } catch (error) {
-    console.error("RedirectResult Error:", error);
-    return null;
+    console.error("getRedirectResult Error:", error);
+    throw error;
   }
 };
+
+export { onAuthStateChanged };
