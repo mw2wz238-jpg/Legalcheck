@@ -1,0 +1,50 @@
+name: CI Build & Firebase Fingerprint
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build application
+      run: npm run build
+
+    - name: Generate and Log SHA-1 Fingerprint
+      run: |
+        echo "------------------------------------------------------------"
+        echo "GENERATING PRODUCTION KEYSTORE FOR SHA-1 LOGGING"
+        echo "------------------------------------------------------------"
+        
+        # Generating a signing key strictly for extracting the fingerprint
+        # In a real production setup, you should use secrets for passwords.
+        keytool -genkey -v -keystore release.keystore -alias release-key \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -dname "CN=FirebaseApp, OU=Prod, O=Build, L=Unknown, S=Unknown, C=US" \
+          -storepass android -keypass android
+        
+        echo ""
+        echo "USE THIS SHA-1 IN FIREBASE CONSOLE (Project Settings -> Android App):"
+        keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA1:"
+        
+        echo ""
+        echo "USE THIS SHA-256 FOR DIGITAL ASSET LINKS (TWA/APK):"
+        keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA256:"
+        echo "------------------------------------------------------------"
