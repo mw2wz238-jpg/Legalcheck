@@ -65,4 +65,4 @@ jobs:
       - name: Generate and Log SHA-1 Fingerprint
         run: |
           echo "--- TWOJE SHA-1 DLA FIREBASE ---"
-          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep SHA1 || echo "Klucz dostępny po pomyślnym buildzie"
+          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep SHA1 || echo "Klucz dostępny po pomyślnym bui ldzie"
