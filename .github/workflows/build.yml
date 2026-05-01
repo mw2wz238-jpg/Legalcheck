@@ -1,68 +1,79 @@
-name: Build Android APK
+name: CI Build & Android APK
+
 on:
   push:
-    branches: [ main ]
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+    - name: Set up Java 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
 
-      - name: Install dependencies
-        run: |
-          npm install
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
 
-      - name: Inject Configuration
-        run: |
-          echo '{ "appId": "com.legalcheck.ai", "appName": "LegalCheck AI", "webDir": "dist" }' > capacitor.config.json
+    - name: Install dependencies
+      run: npm install
 
-      - name: Build web application
-        run: npm run build
+    - name: Build application
+      run: npm run build
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Build Android APK
-        run: |
-          npx cap add android || true
+    - name: Build Android APK
+      run: |
+        echo "BUILDING APK WITH KOTLIN 1.8.20 ENFORCEMENT"
+        # Ensuring Kotlin version to avoid duplicate class errors
+        # This Pkotlin.version flag works with many modern Gradle setups
+        
+        if [ -d "android" ]; then
           npx cap sync android
-          
-          # KLUCZOWE POPRAWKI KONFIGURACJI GRADLE:
-          # 1. Wymuszenie wersji Kotlina w głównym pliku projektu
-          sed -i 's/kotlin_version = .*/kotlin_version = "1.8.20"/' android/build.gradle
-          
-          # 2. Dodanie strategii rozwiązywania konfliktów bezpośrednio do app/build.gradle
-          echo "android {
-              configurations.all {
-                  resolutionStrategy {
-                      force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.20'
-                      force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20'
-                      force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20'
-                  }
-              }
-          }" >> android/app/build.gradle
-          
-          chmod +x android/gradlew
-          cd android && ./gradlew clean assembleDebug
+          cd android
+          ./gradlew assembleRelease -Pkotlin.version=1.8.20
+        else
+          echo "Warning: 'android' directory not found. Please ensure Capacitor is initialized."
+          # If they want to force it globally for a future build:
+          mkdir -p .gradle
+          echo "kotlin.version=1.8.20" >> .gradle/gradle.properties
+        fi
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: legalcheck-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+    - name: Generate and Log SHA-1 Fingerprint
+      run: |
+        echo "------------------------------------------------------------"
+        echo "GENERATING/EXTRACTING FINGERPRINT FOR FIREBASE"
+        echo "------------------------------------------------------------"
+        
+        # Extract from debug keystore if release not available
+        if [ -f "android/app/debug.keystore" ]; then
+           keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep "SHA1:"
+        else
+           # Fallback to generating a dummy one for extraction if needed
+           keytool -genkey -v -keystore release.keystore -alias release-key \
+             -keyalg RSA -keysize 2048 -validity 10000 \
+             -dname "CN=FirebaseApp, OU=Prod, O=Build, L=Unknown, S=Unknown, C=US" \
+             -storepass android -keypass android
+           keytool -list -v -keystore release.keystore -alias release-key -storepass android | grep "SHA1:"
+        fi
+        echo "------------------------------------------------------------"
 
-      - name: Generate and Log SHA-1 Fingerprint
-        run: |
-          echo "--- TWOJE SHA-1 DLA FIREBASE ---"
-          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android | grep SHA1 || echo "Klucz dostępny po pomyślnym bui ldzie"
+    - name: Upload APK
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-apk
+        path: |
+           android/app/build/outputs/apk/release/*.apk
+           release.keystore

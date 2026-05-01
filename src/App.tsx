@@ -15,11 +15,8 @@ import {
   Columns, CheckCircle2, ChevronLeft, Save, Zap, MessageSquare, Send, User, Bot, Share, HelpCircle,
   Lock, ShieldCheck, CreditCard
 } from "lucide-react";
-import { initializeApp } from 'firebase/app';
 import { analyzeLegalDocument, chatWithDocument } from "./geminiService";
 import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
   onAuthStateChanged, 
   signOut,
   User as FirebaseUser
@@ -39,7 +36,7 @@ import {
   getDocFromServer,
   Timestamp
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, signInWithGoogle } from './firebase';
 
 /**
  * CONFIGURATION NOTES:
@@ -496,8 +493,7 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithGoogle();
     } catch (err) {
       console.error(err);
       setToast({ message: "Logowanie nieudane. Spróbuj ponownie.", type: "error" });
