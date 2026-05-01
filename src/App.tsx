@@ -501,6 +501,24 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  // Logic to handle Test Mode (Bypass)
+  const handleTestMode = () => {
+    const mockUser: UserProfile = {
+      name: "Tester APK",
+      email: "test@legalcheck.ai",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=test",
+      subscriptionStatus: "active",
+      dailyAnalysesCount: 0,
+      isPro: true
+    };
+    setUser(mockUser);
+    setIsPro(true);
+    setIsDemoMode(true);
+    setToast({ message: "Uruchomiono tryb testowy. Pamiętaj, że synchronizacja z bazą danych może być ograniczona.", type: "info" });
+  };
+
   const handleLogin = async () => {
     try {
       const result = await signInWithGoogle();
@@ -511,7 +529,7 @@ export default function App() {
       console.error("Login error:", err);
       // Fallback for environment issues
       setShowEmailLogin(true);
-      setToast({ message: "Problem z logowaniem Google. Spróbuj zalogować się e-mailem.", type: "error" });
+      setToast({ message: "Problem z logowaniem Google. Spróbuj zalogować się e-mailem lub użyj trybu testowego.", type: "error" });
     }
   };
 
@@ -532,7 +550,7 @@ export default function App() {
       console.error("Email auth error:", err);
       let msg = "Błąd autoryzacji.";
       if (err.code === "auth/operation-not-allowed") {
-        msg = "Logowanie e-mailem jest wyłączone. Włącz 'Email/Password' w konsoli Firebase (Authentication > Sign-in method).";
+        msg = "⚠️ UWAGA: Logowanie e-mailem jest WYŁĄCZONE w Firebase. Musisz wejść w Console -> Auth -> Sign-in Method i włączyć 'Email/Password'.";
       } else if (err.code === "auth/email-already-in-use") {
         msg = "Ten e-mail jest już przypisany do innego konta.";
       } else if (err.code === "auth/weak-password") {
@@ -540,7 +558,7 @@ export default function App() {
       } else if (err.code === "auth/invalid-email") {
         msg = "Niepoprawny format adresu e-mail.";
       } else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
-        msg = "Błędny e-mail lub hasło. Sprawdź dane i spróbuj ponownie.";
+        msg = "Błędny e-mail lub hasło. Sprawdź dane lub skorzystaj z trybu testowego.";
       }
       setToast({ message: msg, type: "error" });
     }
@@ -612,18 +630,32 @@ export default function App() {
           });
         }
 
-        // Add to history in Firestore
+        // Add to history logic
         const risksCount = (result.match(/🚩|CZERWONE/g) || []).length;
-        if (auth.currentUser) {
-          const historyRef = collection(db, 'users', auth.currentUser.uid, 'history');
-          await addDoc(historyRef, {
-            title: selectedFile ? `Analiza: ${selectedFile.name}` : `Analiza: ${inputText.substring(0, 20)}...`,
-            date: new Date().toLocaleString("pl-PL"),
-            content: result + promoSuffix,
-            sourceText: inputText.trim(),
-            hasRedFlags: risksCount > 0,
-            createdAt: serverTimestamp()
-          });
+        const newItem: AnalysisHistoryItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          title: selectedFile ? `Analiza: ${selectedFile.name}` : `Analiza: ${inputText.substring(0, 20)}...`,
+          date: new Date().toLocaleString("pl-PL"),
+          content: result + promoSuffix,
+          sourceText: documentSource,
+          hasRedFlags: risksCount > 0
+        };
+
+        if (auth.currentUser && !isDemoMode) {
+          try {
+            const historyRef = collection(db, 'users', auth.currentUser.uid, 'history');
+            await addDoc(historyRef, {
+              ...newItem,
+              createdAt: serverTimestamp()
+            });
+          } catch (err) {
+            handleFirestoreError(err, 'create', `users/${auth.currentUser.uid}/history`);
+            // Fallback locally if firestore fails
+            setHistory(prev => [newItem, ...prev]);
+          }
+        } else {
+          // Pure local mode (Demo)
+          setHistory(prev => [newItem, ...prev]);
         }
 
         setToast({ 
@@ -871,13 +903,28 @@ export default function App() {
               </div>
             </form>
           ) : (
-            <button 
-              id="show-email-form"
-              onClick={() => setShowEmailLogin(true)}
-              className="w-full py-4 px-6 border border-zinc-800 rounded-2xl text-zinc-400 font-bold hover:bg-zinc-800/50 transition-all text-sm"
-            >
-              Użyj Loginu i Hasła
-            </button>
+            <div className="space-y-4">
+              <button 
+                id="show-email-form"
+                onClick={() => setShowEmailLogin(true)}
+                className="w-full py-4 px-6 border border-zinc-800 rounded-2xl text-zinc-400 font-bold hover:bg-zinc-800/50 transition-all text-sm mb-4"
+              >
+                Użyj Loginu i Hasła
+              </button>
+
+              <div className="pt-4 border-t border-zinc-800/50">
+                <button
+                  id="demo-bypass-btn"
+                  onClick={handleTestMode}
+                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black text-[10px] uppercase tracking-widest rounded-2xl border border-zinc-700 transition-all"
+                >
+                  🚀 Uruchom Tryb Testowy (Bypass)
+                </button>
+                <p className="mt-3 text-[9px] text-zinc-600 font-bold italic leading-relaxed">
+                  * Tryb testowy pozwala na sprawdzenie interfejsu i funkcji AI bez konieczności logowania.
+                </p>
+              </div>
+            </div>
           )}
           
           <p className="mt-8 text-zinc-600 text-xs uppercase tracking-widest font-black">
