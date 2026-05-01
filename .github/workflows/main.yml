@@ -53,21 +53,9 @@ jobs:
     - name: Generate and Log SHA-1 Fingerprint
       run: |
         echo "------------------------------------------------------------"
-        echo "EXTRACTING DEBUG FINGERPRINT FOR FIREBASE"
+        echo "EXTRACTING KEY FINGERPRINTS FOR FIREBASE"
         echo "------------------------------------------------------------"
-        
-        # Checking possible locations for debug.keystore
-        KEYSTORE_PATH="android/app/debug.keystore"
-        if [ ! -f "$KEYSTORE_PATH" ]; then
-           # Search for it in the android directory if not in standard path
-           KEYSTORE_PATH=$(find android -name "debug.keystore" | head -n 1)
-        fi
-
-        if [ -n "$KEYSTORE_PATH" ] && [ -f "$KEYSTORE_PATH" ]; then
-           keytool -list -v -keystore "$KEYSTORE_PATH" -alias androiddebugkey -storepass android | grep "SHA1:"
-        else
-           echo "Debug keystore not found. It might be generated during the first run if missing."
-        fi
+        cd android && ./gradlew signingReport
         echo "------------------------------------------------------------"
 
     - name: Upload Artifact

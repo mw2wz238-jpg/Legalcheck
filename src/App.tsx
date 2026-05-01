@@ -549,6 +549,13 @@ export default function App() {
 
   const [loginErrorDetail, setLoginErrorDetail] = useState<string | null>(null);
 
+  const handleAdminQuickLogin = async () => {
+    setEmail("admin@legalcheck.ai");
+    setPassword("MasterAdmin2024!");
+    setShowEmailLogin(true);
+    setToast({ message: "Dane admina uzupełnione. Kliknij 'Zaloguj się'.", type: "info" });
+  };
+
   const handleLogin = async () => {
     setLoginErrorDetail(null);
     try {
@@ -931,6 +938,17 @@ export default function App() {
                   className="w-full text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-zinc-300"
                 >
                   Anuluj
+                </button>
+              </div>
+
+              <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <p className="text-[9px] text-amber-400 font-bold uppercase mb-2">Szybki dostęp (APK):</p>
+                <button 
+                  type="button"
+                  onClick={handleAdminQuickLogin}
+                  className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[10px] font-bold rounded-lg border border-amber-500/30"
+                >
+                  Użyj danych Admina
                 </button>
               </div>
             </form>
