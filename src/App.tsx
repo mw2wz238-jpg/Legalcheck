@@ -491,6 +491,10 @@ export default function App() {
     localStorage.setItem("legal_check_history", JSON.stringify(history));
   }, [history]);
 
+  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const handleLogin = async () => {
     try {
       const result = await signInWithGoogle();
@@ -499,15 +503,32 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      let message = "Logowanie nieudane. Spróbuj ponownie.";
-      if (err.code === "auth/popup-blocked") {
-        message = "Okno logowania zostało zablokowane. Zmień ustawienia przeglądarki.";
-      } else if (err.code === "auth/popup-closed-by-user") {
-        message = "Logowanie przerwane przez użytkownika.";
-      } else if (err.code === "auth/unauthorized-domain") {
-        message = "Błąd autoryzacji: domena nie jest uprawniona.";
+      // Fallback for environment issues
+      setShowEmailLogin(true);
+      setToast({ message: "Problem z logowaniem Google. Spróbuj zalogować się e-mailem.", type: "error" });
+    }
+  };
+
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, email, password);
+        setToast({ message: "Konto utworzone pomyślnie!", type: "success" });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+        setToast({ message: "Zalogowano pomyślnie!", type: "success" });
       }
-      setToast({ message, type: "error" });
+      setShowEmailLogin(false);
+    } catch (err: any) {
+      console.error("Email auth error:", err);
+      let msg = "Błąd autoryzacji.";
+      if (err.code === "auth/email-already-in-use") msg = "Ten e-mail jest już zajęty.";
+      if (err.code === "auth/weak-password") msg = "Hasło jest za słabe.";
+      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") msg = "Błędny e-mail lub hasło.";
+      setToast({ message: msg, type: "error" });
     }
   };
 
@@ -769,9 +790,81 @@ export default function App() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
               </svg>
             </div>
-            Zaloguj przez Google
+            Kontynuuj z Google
             <ChevronRight className="w-4 h-4 ml-auto opacity-30 group-hover:opacity-100 transition-opacity" />
           </button>
+
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-800"></div>
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-black">
+              <span className="px-4 bg-zinc-900/40 text-zinc-500">Lub użyj e-maila</span>
+            </div>
+          </div>
+
+          {showEmailLogin ? (
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <input
+                  id="email-field"
+                  type="email"
+                  placeholder="E-mail"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-zinc-800/50 border border-zinc-800 rounded-2xl py-4 pl-12 pr-6 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                  required
+                />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <input
+                  id="password-field"
+                  type="password"
+                  placeholder="Hasło"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-zinc-800/50 border border-zinc-800 rounded-2xl py-4 pl-12 pr-6 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                  required
+                />
+              </div>
+              <button 
+                id="submit-login"
+                type="submit"
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+              >
+                {isRegistering ? "Zarejestruj się" : "Zaloguj się"}
+              </button>
+              
+              <div className="flex flex-col gap-3 pt-2">
+                <button
+                  id="toggle-auth-mode"
+                  type="button"
+                  onClick={() => setIsRegistering(!isRegistering)}
+                  className="w-full text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:text-indigo-300"
+                >
+                  {isRegistering ? "Masz już konto? Zaloguj się" : "Nie masz konta? Zarejestruj się"}
+                </button>
+                <button
+                  id="cancel-email-login"
+                  type="button"
+                  onClick={() => setShowEmailLogin(false)}
+                  className="w-full text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-zinc-300"
+                >
+                  Anuluj
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button 
+              id="show-email-form"
+              onClick={() => setShowEmailLogin(true)}
+              className="w-full py-4 px-6 border border-zinc-800 rounded-2xl text-zinc-400 font-bold hover:bg-zinc-800/50 transition-all text-sm"
+            >
+              Użyj Loginu i Hasła
+            </button>
+          )}
           
           <p className="mt-8 text-zinc-600 text-xs uppercase tracking-widest font-black">
             Narzędzie informacyjne • Nie porada prawna

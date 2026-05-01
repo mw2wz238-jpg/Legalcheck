@@ -5,6 +5,8 @@ import {
   browserPopupRedirectResolver, 
   signInWithPopup, 
   GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged
 } from 'firebase/auth';
