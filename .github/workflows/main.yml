@@ -38,6 +38,8 @@ jobs:
     - name: Build Android APK
       run: |
         echo "INITIALIZING AND BUILDING ANDROID APK"
+        echo '{"appId": "com.legalcheck.ai", "appName": "LegalCheck AI", "webDir": "dist"}' > capacitor.config.json
+        mkdir -p dist && touch dist/index.html
         npx cap add android || true
         npx cap copy
         npx cap sync
