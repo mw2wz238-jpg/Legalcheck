@@ -41,7 +41,8 @@ import {
   db, 
   signInWithGoogle, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
+  createUserWithEmailAndPassword,
+  handleRedirectResult
 } from './firebase';
 
 /**
@@ -479,6 +480,33 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Autocheck for redirect login result on mount
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await handleRedirectResult();
+        if (result?.user) {
+          const userProfile: UserProfile = {
+            name: result.user.displayName || "Użytkownik",
+            email: result.user.email || "",
+            avatar: result.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${result.user.uid}`,
+            subscriptionStatus: "active",
+            dailyAnalysesCount: 0,
+            isPro: true
+          };
+          setUser(userProfile);
+          setIsPro(true);
+          setToast({ message: "Zalogowano pomyślnie!", type: "success" });
+        }
+      } catch (err: any) {
+        if (err.code === 'auth/unauthorized-domain') {
+          setToast({ message: "Błąd: Ta domena nie jest zarejestrowana w Firebase Authorized Domains.", type: "error" });
+        }
+      }
+    };
+    checkRedirect();
+  }, []);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -920,9 +948,17 @@ export default function App() {
                 >
                   🚀 Uruchom Tryb Testowy (Bypass)
                 </button>
-                <p className="mt-3 text-[9px] text-zinc-600 font-bold italic leading-relaxed">
-                  * Tryb testowy pozwala na sprawdzenie interfejsu i funkcji AI bez konieczności logowania.
-                </p>
+                
+                {/* Panel Diagnostyczny */}
+                <div className="mt-4 p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-xl">
+                  <p className="text-[9px] text-indigo-300 font-bold uppercase tracking-wider mb-2">Diagnostyka Logowania:</p>
+                  <div className="space-y-1 text-[8px] text-zinc-400 font-mono break-all">
+                    <p>Domena: <span className="text-white">{window.location.hostname}</span></p>
+                    <p className="mt-2 leading-relaxed">
+                      💡 Jeśli logowanie Google nie działa: Dodaj powyższą domenę do <span className="text-indigo-400">Firebase Console &gt; Auth &gt; Settings &gt; Authorized Domains</span>.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
