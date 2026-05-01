@@ -1,63 +1,62 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { 
-  getAuth, 
-  setPersistence, 
-  browserLocalPersistence, 
+  initializeAuth, 
+  indexedDBLocalPersistence, 
   browserPopupRedirectResolver, 
-  signInWithRedirect, 
-  getRedirectResult, 
+  signInWithPopup, 
   GoogleAuthProvider,
+  getAuth,
   onAuthStateChanged
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Inicjalizacja Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Inicjalizacja Firebase z jawną konfiguracją authDomain, aby uniknąć problemów z redirect-origin
+const config = {
+  ...firebaseConfig,
+  authDomain: `${firebaseConfig.projectId}.firebaseapp.com`
+};
+
+const app = !getApps().length ? initializeApp(config) : getApp();
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 /**
- * Inicjalizacja Auth z obsługą trwałości sesji dla środowisk mobilnych.
- * browserLocalPersistence jest często bardziej niezawodny w WebView niż indexedDB.
+ * Inicjalizacja Auth zoptymalizowana pod Capacitor (Android/APK).
+ * indexedDBLocalPersistence zapewnia trwałość sesji w webview,
+ * a browserPopupRedirectResolver pomaga w komunikacji z oknem logowania.
  */
-export const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(err => {
-  console.error("Auth persistence error:", err);
-});
+export const auth = (() => {
+  const existingApps = getApps();
+  if (existingApps.length > 0) {
+    try {
+      const a = getAuth(app);
+      if (a) return a;
+    } catch (e) {
+      // Auth nie zainicjalizowane jeszcze
+    }
+  }
+  return initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver,
+  });
+})();
 
 /**
- * Główna funkcja logowania przez Google (Redirect Flow).
- * W środowiskach mobilnych (APK/WebView) przekierowanie jest zazwyczaj
- * bardziej stabilne niż okna popup.
+ * Funkcja logowania przez Google przy użyciu Popup Flow.
+ * Jest to najbardziej stabilna metoda w Capacitorze bez dedykowanych pluginów natywnych,
+ * ponieważ nie wymaga obsługi głębokich linków (deep linking) ani powrotu do localhost.
  */
 export const signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
+  // Zawsze pytaj o wybór konta
   provider.setCustomParameters({ prompt: 'select_account' });
   
-  console.log("Starting Google Sign-In Redirect...");
   try {
-    return await signInWithRedirect(auth, provider);
-  } catch (error) {
-    console.error("SignInWithRedirect Error:", error);
-    throw error;
-  }
-};
-
-/**
- * Przechwytywanie wyniku logowania po powrocie z przekierowania.
- */
-export const handleRedirectResult = async () => {
-  try {
-    console.log("Checking for redirect result...");
-    const result = await getRedirectResult(auth);
-    if (result) {
-      console.log("Auth result found:", result.user.email);
-    } else {
-      console.log("No redirect result found.");
-    }
+    // Jawnie podajemy resolver dla środowisk hybrydowych
+    const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     return result;
   } catch (error) {
-    console.error("getRedirectResult Error:", error);
+    console.error("SignInWithPopup Error:", error);
     throw error;
   }
 };
