@@ -43,10 +43,8 @@ jobs:
         
         npx cap add android || true
         
-        # Injecting fix for Duplicate class errors by forcing Kotlin stdlib version
-        if [ -f "android/build.gradle" ]; then
-          echo "configurations.all { resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.20' }" >> android/build.gradle
-        fi
+        # Forced fix for Duplicate class errors by forcing Kotlin stdlib versions
+        printf "android {\n    configurations.all {\n        resolutionStrategy {\n            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.20'\n            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20'\n            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20'\n        }\n    }\n}" >> android/app/build.gradle
         
         npx cap sync
         chmod +x android/gradlew
