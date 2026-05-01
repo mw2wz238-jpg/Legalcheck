@@ -40,8 +40,14 @@ jobs:
         echo "INITIALIZING AND BUILDING ANDROID APK"
         echo '{"appId": "com.legalcheck.ai", "appName": "LegalCheck AI", "webDir": "dist"}' > capacitor.config.json
         mkdir -p dist && touch dist/index.html
+        
         npx cap add android || true
-        npx cap copy
+        
+        # Injecting fix for Duplicate class errors by forcing Kotlin stdlib version
+        if [ -f "android/build.gradle" ]; then
+          echo "configurations.all { resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.20' }" >> android/build.gradle
+        fi
+        
         npx cap sync
         chmod +x android/gradlew
         cd android && ./gradlew clean assembleDebug -Pkotlin.version=1.8.20
