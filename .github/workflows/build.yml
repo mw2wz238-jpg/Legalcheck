@@ -20,7 +20,6 @@ jobs:
 
       - name: Build Web Project
         run: |
-          # Budujemy wersję webową, którą Capacitor zamieni w APK
           CI=false npm run build || CI=false npx webpack --mode production
 
       - name: Setup Java 21
@@ -31,20 +30,24 @@ jobs:
 
       - name: Generate Fingerprints for Firebase
         run: |
-          # Generujemy klucze potrzebne do logowania Google
           mkdir -p ~/.android
           keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android
 
       - name: Build Android APK
         run: |
-          # Jeśli folder android nie istnieje, inicjalizujemy go
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
+          # WYMUSZONA KONFIGURACJA (Naprawia błąd ze screena)
+          # Tworzymy plik config na poczekaniu, jeśli go brakuje
+          echo '{"appId": "com.legalcheck.ai", "appName": "LegalCheck AI", "webDir": "dist", "bundledWebRuntime": false}' > capacitor.config.json
           
-          # Synchronizacja i kompilacja APK
+          # Inicjalizacja platformy
+          npx cap init "LegalCheck AI" "com.legalcheck.ai" --web-dir dist
+          
+          # Dodawanie i synchronizacja (ignorujemy błędy, jeśli folder już istnieje)
+          npx cap add android || true
           npx cap sync android
+          
+          # Budowanie pliku APK
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
@@ -52,5 +55,5 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LegalCheck-AI-Final
+          name: LegalCheck-AI-Final-Build
           path: android/app/build/outputs/apk/debug/app-debug.apk
