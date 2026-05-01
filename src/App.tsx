@@ -36,7 +36,7 @@ import {
   getDocFromServer,
   Timestamp
 } from 'firebase/firestore';
-import { auth, db, signInWithGoogle } from './firebase';
+import { auth, db, signInWithGoogle, handleRedirectResult } from './firebase';
 
 /**
  * CONFIGURATION NOTES:
@@ -474,6 +474,21 @@ export default function App() {
     }
   }, [toast]);
 
+  // Handle Redirect Result for Google Login (mobile compatibility)
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await handleRedirectResult();
+        if (result?.user) {
+          setToast({ message: "Zalogowano pomyślnie!", type: "success" });
+        }
+      } catch (error) {
+        console.error("Auth redirect error:", error);
+      }
+    };
+    checkRedirect();
+  }, []);
+
   // Load history from localStorage on mount
   useEffect(() => {
     const savedHistory = localStorage.getItem("legal_check_history");
@@ -493,10 +508,21 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithGoogle();
-    } catch (err) {
-      console.error(err);
-      setToast({ message: "Logowanie nieudane. Spróbuj ponownie.", type: "error" });
+      const result = await signInWithGoogle();
+      if (result?.user) {
+        setToast({ message: "Zalogowano pomyślnie!", type: "success" });
+      }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      let message = "Logowanie nieudane. Spróbuj ponownie.";
+      if (err.code === "auth/popup-blocked") {
+        message = "Okno logowania zostało zablokowane. Zmień ustawienia przeglądarki.";
+      } else if (err.code === "auth/popup-closed-by-user") {
+        message = "Logowanie przerwane przez użytkownika.";
+      } else if (err.code === "auth/unauthorized-domain") {
+        message = "Błąd autoryzacji: domena nie jest uprawniona.";
+      }
+      setToast({ message, type: "error" });
     }
   };
 
